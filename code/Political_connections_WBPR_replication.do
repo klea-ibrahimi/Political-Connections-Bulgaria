@@ -1,0 +1,564 @@
+**************************************************************************
+*** REPLICATION DO-FILE
+*** "The Economic Impact of Firms' Political Connections"
+*** Ibrahimi, Fazekas, Schiffbauer, Galev
+***
+*** Produces all tables and the event-study figures of the paper.
+*** Starting dataset: Orbis_pcfirms_elections_merged.dta
+***   (political connection variables and TFP already computed;
+***    election-based treatment variables are defined below)
+***
+*** Structure
+***   0.  Setup
+***   PART A - FIRM-LEVEL ANALYSIS
+***   A.1 Sample and variable definitions
+***   Table 1   Descriptive statistics: outcomes
+***   Table 2   Descriptive statistics: size, age, sector
+***   Table 3   Descriptive statistics: regions
+***   Table 5   Connecting to power - firm performance
+***   Table 6   Connecting to power - local vs national elections
+***   Figure A1 Event studies - firm level (Table 5/6 specification)
+***   Table 7   Losing connections
+***   Table 10  Election margins (Annex)
+***   PART B - SECTOR-LEVEL ANALYSIS
+***   B.1 Sample and variable definitions
+***   Table 4   Number of sectors across years
+***   Table 8   Sector connecting to power
+***   Table 9   Sector connecting to power - local vs national elections
+***   Figure A2 Event studies - sector level (Table 8/9 specification)
+***
+*** Figures 1 and 2 (election timelines) are illustrations based on the
+*** election calendar and are not produced by code.
+**************************************************************************
+
+**************************************************************************
+*** 0. SETUP
+**************************************************************************
+clear all
+set more off
+version 18
+
+*** Set the root folder of the replication package (the only path to edit)
+global root "/Users/kleaibrahimi/Library/CloudStorage/Dropbox/bulgaria/World_Bank/replication_package"
+
+global data    "${root}/data"
+global tables  "${root}/output/tables"
+global figures "${root}/output/figures"
+
+*** Required user-written packages (uncomment to install)
+* ssc install ftools,    replace
+* ssc install reghdfe,   replace
+* ssc install estout,    replace
+* ssc install coefplot,  replace
+* ssc install ietoolkit, replace   // iebaltab
+
+*** Variables kept from the starting dataset
+global keepvars bvdidnumber empl nuts3_int year lnsales_real lnva_real ///
+	lnempl lnrev_real lnaveragecostofemployee_th_real lnfixedassets_real ///
+	lnintangiblefixedassets_real lncap_real lnage markup_tl_pc Markup_tl_pc ///
+	Markup_cd_pc markup_cd_pc tfp_cd_pc tfp_tl_pc gained_power_n ///
+	remain_power_n lost_power_n power_l gained_power_l remain_power_l lost_power_l ///
+	local_2011 local_2015 local_2019 local_2007 mergepc first_treat ///
+	local_firm national_firm size age_ct sectors_group ///
+	plforperiodnetincome_real lnoperatingplebit_real ///
+	operatingplebitmargin plnetincomemargin ///
+	operatingplebitmarginL plnetincomemarginL lnplforperiodnetincome_real ///
+	lninv_real lnsalesw lnvaw lnkl intangiblesh operatingplebit_real ///
+	Parliament_41 Parliament_42 Parliament_43 Parliament_44 locally_con ///
+	national_conn age emp nace2 standardisedlegalform active nace4 codemun ///
+	margins_2015 margins_2011 materialcosts_real
+
+*** Event-study plot labels
+global label_lnprofit     "Log Profit"
+global label_lnsales_real "Log Sales"
+global label_lnempl       "Log Employment"
+global label_lnavg_wage   "Log Average Wage"
+global label_lnvaw        "Log Value Added per Worker"
+global label_tfp_tl_pc    "TFP (Levinsohn-Petrin)"
+global label_tfp_cd_pc    "TFP (Cobb-Douglas)"
+
+
+**************************************************************************
+**************************************************************************
+*** PART A - FIRM-LEVEL ANALYSIS
+**************************************************************************
+**************************************************************************
+
+**************************************************************************
+*** A.1 SAMPLE AND VARIABLE DEFINITIONS
+**************************************************************************
+use "${data}/Orbis_pcfirms_elections_merged.dta", clear
+
+drop if missing(codemun) // drop observations with no information on municipality code
+
+keep ${keepvars}
+
+gen pcfirm=0
+replace pcfirm=1 if mergepc==3
+gen lnmaterial_costs=log(materialcosts_real)
+encode age_ct, gen(Age_ct)
+encode sectors_group, gen(Sectors_group)
+encode size, gen(Size)
+
+*** Treatment: firm gets connected to power (wins local or national election)
+gen treated=0
+replace treated=1 if first_treat==2011 & year>=2011
+replace treated=1 if first_treat==2015 & year>=2015
+replace treated=1 if first_treat==2013 & year>=2013
+replace treated=1 if first_treat==2014 & year>=2014
+replace treated=1 if first_treat==2017 & year>=2017
+replace treated=0 if first_treat==2011 & local_2015==0 & year>2015
+replace treated=0 if first_treat==2013 & Parliament_43==0 &  year>2014
+replace treated=1 if Parliament_43==0 & Parliament_42==1 &  year==2014
+replace treated=1 if first_treat==2013 & Parliament_43==0 & Parliament_44==1 &  year>2017
+replace treated=0 if first_treat==2014 & Parliament_44==0 & year>2017
+
+*** Treatment: firm loses connection (loses election when previously in power)
+gen first_lost=0
+bysort bvdidnumber: replace first_lost=2011 if local_2007==1 & local_2011==0
+bysort bvdidnumber: replace first_lost=2015 if local_2015==0 & local_2011==1
+bysort bvdidnumber: replace first_lost=2013 if Parliament_41==1 &  Parliament_42==0
+bysort bvdidnumber: replace first_lost=2014 if Parliament_43==0 &  Parliament_42==1 & first_lost==0
+bysort bvdidnumber: replace first_lost=2017 if Parliament_44==0 &  Parliament_43==1 & first_lost==0
+tab first_lost first_treat if first_lost!=0 & first_treat!=0
+
+gen treated_lost=0
+replace treated_lost=1 if year>=first_lost & first_lost!=0
+
+replace treated=0 if first_treat==2007
+replace treated=0 if first_treat==2009
+
+*** Control: firms connected before 2010 (until they lose the election)
+gen treated_pre10=0
+replace treated_pre10=1 if first_treat==2007 & year<first_lost
+replace treated_pre10=1 if first_treat==2009 & year<first_lost
+
+*** Outcomes
+gen lnprofit=lnplforperiodnetincome_real
+gen lnavg_wage=lnaveragecostofemployee_th_real
+
+*** Local vs national connection
+gen treated_loc=0
+gen treated_nat=0
+replace treated_loc=treated if first_treat==2011 | first_treat==2015
+replace treated_nat=treated if first_treat==2013 | first_treat==2014 | first_treat==2017
+
+*** Sample restrictions
+drop if first_treat==0 & pcfirm==1          // PC firms never connected through elections (other connection types)
+xtset bvdidnumber year
+drop if first_treat==2007 & first_lost==0   // connected before 2007 and never lose power
+drop if first_treat==2009 & first_lost==0   // connected before 2009 and never lose power
+drop if pcfirm==1 & missing(first_treat)    // connected, but timing of connection not observed
+
+*** Firm type for descriptive statistics
+gen type=1 if first_treat==0
+replace type=2 if first_treat==2011 | first_treat==2015
+replace type=3 if first_treat==2013 | first_treat==2014 | first_treat==2017
+label define type_lbl 1 "Never-connected" 2 "Locally connected" 3 "Nationally connected"
+label values type type_lbl
+
+
+**************************************************************************
+*** TABLE 1: Descriptive statistics - outcomes by connection type
+**************************************************************************
+iebaltab lnprofit lnsales_real lnempl lnavg_wage tfp_tl_pc tfp_cd_pc lnva_real, ///
+	grpvar(type) savetex("${tables}/Table1_descriptives.tex") replace
+
+*** Number of unique firms by type
+codebook bvdidnumber if type==1, compact
+codebook bvdidnumber if type==2, compact
+codebook bvdidnumber if type==3, compact
+
+
+**************************************************************************
+*** TABLES 2-3: Descriptive statistics - size, age, sector, region
+*** (one observation per firm: first year observed)
+**************************************************************************
+preserve
+	bysort bvdidnumber (year): keep if _n==1
+
+	*** Table 2: size, age and sector shares (column %)
+	tab Size          type, col nofreq
+	tab Age_ct        type, col nofreq
+	tab Sectors_group type, col nofreq
+	tab type
+
+	*** Table 3: regional (NUTS3) shares (column %)
+	tab nuts3_int     type, col nofreq
+restore
+
+
+**************************************************************************
+*** TABLE 5: Connecting to power - firm performance
+**************************************************************************
+eststo clear
+
+local outcomes1 lnprofit lnsales_real lnempl lnavg_wage lnvaw
+local outcomes2 tfp_tl_pc tfp_cd_pc
+local controls  treated treated_lost treated_pre10
+
+foreach v in `outcomes1' {
+	eststo: reghdfe `v' `controls',       cluster(nace4) absorb(i.nace4##i.year i.bvdidnumber)
+	eststo: reghdfe `v' `controls' lnage, cluster(nace4) absorb(i.nace4##i.year i.bvdidnumber)
+}
+foreach v in `outcomes2' {
+	eststo: reghdfe `v' `controls',                    cluster(nace4) absorb(i.nace4##i.year i.bvdidnumber)
+	eststo: reghdfe `v' `controls' lnage,              cluster(nace4) absorb(i.nace4##i.year i.bvdidnumber)
+	eststo: reghdfe `v' `controls' lnage lnsales_real, cluster(nace4) absorb(i.nace4##i.year i.bvdidnumber)
+}
+esttab using "${tables}/Table5_firms_connected.csv", nocons se r2 ar2 starlevels(* 0.1 ** 0.05 *** 0.01) replace
+esttab using "${tables}/Table5_firms_connected.tex", nocons se r2 ar2 starlevels(* 0.1 ** 0.05 *** 0.01) replace
+
+
+**************************************************************************
+*** TABLE 6: Connecting to power - local vs national elections
+**************************************************************************
+eststo clear
+
+local outcomes1 lnprofit lnsales_real lnempl lnavg_wage lnvaw
+local outcomes2 tfp_tl_pc tfp_cd_pc
+local controls  treated_loc treated_nat treated_lost treated_pre10
+
+foreach v in `outcomes1' {
+	eststo: reghdfe `v' `controls',       cluster(nace4) absorb(i.nace4##i.year i.bvdidnumber)
+	eststo: reghdfe `v' `controls' lnage, cluster(nace4) absorb(i.nace4##i.year i.bvdidnumber)
+}
+foreach v in `outcomes2' {
+	eststo: reghdfe `v' `controls',                    cluster(nace4) absorb(i.nace4##i.year i.bvdidnumber)
+	eststo: reghdfe `v' `controls' lnage,              cluster(nace4) absorb(i.nace4##i.year i.bvdidnumber)
+	eststo: reghdfe `v' `controls' lnage lnsales_real, cluster(nace4) absorb(i.nace4##i.year i.bvdidnumber)
+}
+esttab using "${tables}/Table6_firms_local_national.csv", nocons se r2 ar2 starlevels(* 0.1 ** 0.05 *** 0.01) replace
+esttab using "${tables}/Table6_firms_local_national.tex", nocons se r2 ar2 starlevels(* 0.1 ** 0.05 *** 0.01) replace
+
+
+**************************************************************************
+*** FIGURE A1: Event studies - firm level
+*** Same specification and sample as Tables 5 and 6.
+*** Event time capped at -3 and +4; t=-1 is the omitted baseline.
+*** Pre-trend test: joint F-test that the t=-3 and t=-2 coefficients are zero.
+**************************************************************************
+gen event_time = year - first_treat if first_treat != 0 & first_treat != .
+replace event_time = . if first_treat == 2007 | first_treat == 2009
+replace event_time = -3 if event_time < -3 & event_time != .
+replace event_time = 4  if event_time > 4  & event_time != .
+
+foreach t in m3 m2 0 1 2 3 4 {
+	gen evt_`t' = 0
+}
+replace evt_m3 = 1 if event_time == -3
+replace evt_m2 = 1 if event_time == -2
+replace evt_0  = 1 if event_time ==  0
+replace evt_1  = 1 if event_time ==  1
+replace evt_2  = 1 if event_time ==  2
+replace evt_3  = 1 if event_time ==  3
+replace evt_4  = 1 if event_time ==  4
+
+local evt      evt_m3 evt_m2 evt_0 evt_1 evt_2 evt_3 evt_4
+local outcomes lnprofit lnsales_real lnempl lnavg_wage lnvaw tfp_tl_pc tfp_cd_pc
+
+*** Samples: all firms, nationally connected vs never-connected, locally connected vs never-connected
+local cond_all ""
+local cond_nat "if first_treat==2013 | first_treat==2014 | first_treat==2017 | pcfirm==0"
+local cond_loc "if first_treat==2011 | first_treat==2015 | pcfirm==0"
+local name_all "All Firms"
+local name_nat "National Firms"
+local name_loc "Local Firms"
+
+foreach s in all nat loc {
+	eststo clear
+	local graphs ""
+	foreach v in `outcomes' {
+		eststo: reghdfe `v' `evt' treated_lost treated_pre10 lnage `cond_`s'', ///
+			cluster(nace4) absorb(i.nace4##i.year i.bvdidnumber)
+		test evt_m3 evt_m2
+		estadd scalar pretrend_F = r(F)
+		estadd scalar pretrend_p = r(p)
+
+		coefplot, keep(`evt') vertical ///
+			yline(0, lcolor(red) lpattern(dash)) ///
+			order(`evt') ///
+			rename(evt_m3="-3" evt_m2="-2" evt_0="0" evt_1="1" evt_2="2" evt_3="3" evt_4="4") ///
+			title("${label_`v'} - `name_`s''", size(medium)) ///
+			xtitle("Years relative to connection") ytitle("Coefficient") ///
+			mcolor(navy) ciopts(recast(rcap) color(navy))
+		graph save "${figures}/evt_`s'_`v'.gph", replace
+		local graphs `"`graphs' "${figures}/evt_`s'_`v'.gph""'
+	}
+	esttab using "${tables}/FigureA1_event_study_firms_`s'.csv", keep(`evt') ///
+		nocons se r2 scalars(pretrend_F pretrend_p) starlevels(* 0.1 ** 0.05 *** 0.01) replace
+
+	graph combine `graphs', rows(2) title("Event Studies: `name_`s''") xsize(20) ysize(12)
+	graph export "${figures}/FigureA1_event_studies_firms_`s'.pdf", replace
+}
+
+*** All outcomes x all firm types in one figure
+local all_graphs ""
+foreach v in `outcomes' {
+	local all_graphs `"`all_graphs' "${figures}/evt_all_`v'.gph" "${figures}/evt_nat_`v'.gph" "${figures}/evt_loc_`v'.gph""'
+}
+graph combine `all_graphs', rows(7) cols(3) ///
+	title("Event Studies: All Outcomes by Firm Type") xsize(20) ysize(40)
+graph export "${figures}/FigureA1_event_studies_firms_combined.pdf", replace
+
+
+**************************************************************************
+*** TABLE 7: Losing connections
+**************************************************************************
+drop if pcfirm==0 & lnvaw==. // more balanced sample
+
+eststo clear
+
+local outcomes1 lnprofit lnsales_real lnempl lnavg_wage lnvaw
+local outcomes2 tfp_tl_pc tfp_cd_pc
+local controls  treated treated_lost
+
+foreach v in `outcomes1' {
+	eststo: reghdfe `v' `controls',       cluster(nace4) absorb(i.nace4##i.year i.bvdidnumber)
+	eststo: reghdfe `v' `controls' lnage, cluster(nace4) absorb(i.nace4##i.year i.bvdidnumber)
+}
+foreach v in `outcomes2' {
+	eststo: reghdfe `v' `controls',                    cluster(nace4) absorb(i.nace4##i.year i.bvdidnumber)
+	eststo: reghdfe `v' `controls' lnage,              cluster(nace4) absorb(i.nace4##i.year i.bvdidnumber)
+	eststo: reghdfe `v' `controls' lnage lnsales_real, cluster(nace4) absorb(i.nace4##i.year i.bvdidnumber)
+}
+esttab using "${tables}/Table7_firms_lost.csv", nocons se r2 ar2 starlevels(* 0.1 ** 0.05 *** 0.01) replace
+esttab using "${tables}/Table7_firms_lost.tex", nocons se r2 ar2 starlevels(* 0.1 ** 0.05 *** 0.01) replace
+
+
+**************************************************************************
+*** TABLE 10 (Annex): Connecting to local power by election margin
+*** Low margin: winning margin <= 10%; high margin: > 10%
+**************************************************************************
+gen loc_low_marg=0
+gen loc_high_marg=0
+replace loc_low_marg=1  if first_treat==2011 & margins_2011<=0.1 & year>=2011
+replace loc_low_marg=1  if first_treat==2015 & margins_2015<=0.1 & year>=2015
+replace loc_high_marg=1 if first_treat==2011 & margins_2011>0.1  & year>=2011
+replace loc_high_marg=1 if first_treat==2015 & margins_2015>0.1  & year>=2015
+
+eststo clear
+
+local outcomes1 lnprofit lnsales_real lnempl lnvaw
+local outcomes2 lnavg_wage tfp_tl_pc tfp_cd_pc
+local controls  loc_low_marg loc_high_marg treated_nat treated_lost treated_pre10
+
+foreach v in `outcomes1' {
+	eststo: reghdfe `v' `controls',       cluster(nace4) absorb(i.nace4##i.year i.bvdidnumber)
+	eststo: reghdfe `v' `controls' lnage, cluster(nace4) absorb(i.nace4##i.year i.bvdidnumber)
+}
+foreach v in `outcomes2' {
+	eststo: reghdfe `v' `controls',                    cluster(nace4) absorb(i.nace4##i.year i.bvdidnumber)
+	eststo: reghdfe `v' `controls' lnage,              cluster(nace4) absorb(i.nace4##i.year i.bvdidnumber)
+	eststo: reghdfe `v' `controls' lnage lnsales_real, cluster(nace4) absorb(i.nace4##i.year i.bvdidnumber)
+}
+esttab using "${tables}/Table10_firms_margins.csv", nocons se r2 ar2 starlevels(* 0.1 ** 0.05 *** 0.01) replace
+esttab using "${tables}/Table10_firms_margins.tex", nocons se r2 ar2 starlevels(* 0.1 ** 0.05 *** 0.01) replace
+eststo clear
+
+
+**************************************************************************
+**************************************************************************
+*** PART B - SECTOR-LEVEL ANALYSIS
+**************************************************************************
+**************************************************************************
+
+**************************************************************************
+*** B.1 SAMPLE AND VARIABLE DEFINITIONS
+**************************************************************************
+use "${data}/Orbis_pcfirms_elections_merged.dta", clear
+
+drop if missing(codemun) // drop observations with no information on municipality code
+
+keep ${keepvars}
+
+gen pcfirm=0
+replace pcfirm=1 if mergepc==3
+encode age_ct, gen(Age_ct)
+encode sectors_group, gen(Sectors_group)
+encode size, gen(Size)
+
+*** Firm-level treatment (as in Part A)
+gen treated=0
+replace treated=1 if first_treat==2011 & year>=2011
+replace treated=1 if first_treat==2015 & year>=2015
+replace treated=1 if first_treat==2013 & year>=2013
+replace treated=1 if first_treat==2014 & year>=2014
+replace treated=1 if first_treat==2017 & year>=2017
+replace treated=0 if first_treat==2011 & local_2015==0 &  year>2015
+replace treated=0 if first_treat==2013 & Parliament_43==0 &  year>2014
+replace treated=1 if Parliament_43==0 & Parliament_42==1  &  year==2014
+replace treated=1 if first_treat==2013 & Parliament_43==0 & Parliament_44==1 &  year>2017
+replace treated=0 if first_treat==2014 & Parliament_44==0  & year>2017
+tab first_treat year
+
+replace first_treat=. if first_treat==0
+
+*** Sector treatment: earliest year a firm in the NACE4 sector gets connected
+egen first_treat_ind=min(first_treat), by(nace4)
+
+gen treated_ind=0
+forvalues i = 2010(1)2018 {
+	replace treated_ind=1 if first_treat_ind==`i' & year>=`i'
+}
+
+*** Firm loses connection
+gen first_lost=0
+bysort bvdidnumber: replace first_lost=2011 if local_2007==1 & local_2011==0
+bysort bvdidnumber: replace first_lost=2015 if local_2015==0 & local_2011==1
+bysort bvdidnumber: replace first_lost=2013 if Parliament_41==1 &  Parliament_42==0
+bysort bvdidnumber: replace first_lost=2014 if Parliament_43==0 &  Parliament_42==1 & first_lost==0
+bysort bvdidnumber: replace first_lost=2017 if Parliament_44==0 &  Parliament_43==1 & first_lost==0
+
+gen treated_lost=0
+forvalues i = 2010(1)2018 {
+	replace treated_lost=1 if first_lost==`i' & year>=`i'
+}
+
+*** Sector loses connection: all connected firms in the sector have lost power
+bysort nace4 year: gen treated_sum_ind=sum(treated)
+bysort nace4: gen ever_treated=sum(treated)
+bysort nace4 year: egen first_lost_ind=max(first_lost) if treated_sum_ind==0 & ever_treated!=0
+
+replace first_treat_ind=0 if first_treat_ind==.
+
+gen ind_lost=0
+bysort nace4 year: replace ind_lost=1 if first_lost_ind!=0 & first_lost_ind<=year
+
+*** Outcomes
+gen lnprofit=lnplforperiodnetincome_real
+gen lnavg_wage=lnaveragecostofemployee_th_real
+
+*** Local vs national sector connection
+gen treated_ind_loc=0
+gen treated_ind_nat=0
+replace treated_ind_loc=1 if first_treat_ind==2011 & year>=2011
+replace treated_ind_loc=1 if first_treat_ind==2015 & year>=2015
+replace treated_ind_nat=1 if first_treat_ind==2013 & year>=2013
+replace treated_ind_nat=1 if first_treat_ind==2014 & year>=2014
+replace treated_ind_nat=1 if first_treat_ind==2017 & year>=2017
+
+
+**************************************************************************
+*** TABLE 4: Number of sectors across years
+*** Computed before dropping sectors connected in 2007/2009.
+**************************************************************************
+preserve
+	collapse (max) treated_ind ind_lost, by(nace4 year)
+	gen sector_status = 1
+	replace sector_status = 2 if treated_ind==1
+	replace sector_status = 3 if ind_lost==1
+	label define status_lbl 1 "Not yet connected" 2 "Connected" 3 "Disconnected"
+	label values sector_status status_lbl
+	tab sector_status year
+restore
+
+
+**************************************************************************
+*** Sample restriction: drop sectors connected before 2010
+**************************************************************************
+drop if first_treat_ind==2007
+drop if first_treat_ind==2009
+
+
+**************************************************************************
+*** TABLE 8: Sector connecting to power
+**************************************************************************
+eststo clear
+
+local outcomes lnprofit lnsales_real lnempl lnavg_wage tfp_tl_pc tfp_cd_pc lnvaw
+local controls treated_ind ind_lost
+
+foreach v in `outcomes' {
+	eststo: reghdfe `v' `controls', cluster(nace4) absorb(i.nace4 i.year)
+	eststo: reghdfe `v' `controls', cluster(nace4) absorb(i.bvdidnumber i.year)
+}
+esttab using "${tables}/Table8_sectors_connected.csv", nocons se r2 ar2 starlevels(* 0.1 ** 0.05 *** 0.01) replace
+esttab using "${tables}/Table8_sectors_connected.tex", nocons se r2 ar2 starlevels(* 0.1 ** 0.05 *** 0.01) replace
+
+
+**************************************************************************
+*** TABLE 9: Sector connecting to power - local vs national elections
+**************************************************************************
+eststo clear
+
+local outcomes lnprofit lnsales_real lnempl lnavg_wage tfp_tl_pc tfp_cd_pc lnvaw
+local controls treated_ind_loc treated_ind_nat ind_lost
+
+foreach v in `outcomes' {
+	eststo: reghdfe `v' `controls', cluster(nace4) absorb(i.nace4 i.year)
+	eststo: reghdfe `v' `controls', cluster(nace4) absorb(i.bvdidnumber i.year)
+}
+esttab using "${tables}/Table9_sectors_local_national.csv", nocons se r2 ar2 starlevels(* 0.1 ** 0.05 *** 0.01) replace
+esttab using "${tables}/Table9_sectors_local_national.tex", nocons se r2 ar2 starlevels(* 0.1 ** 0.05 *** 0.01) replace
+
+
+**************************************************************************
+*** FIGURE A2: Event studies - sector level
+*** Same specification and sample as Tables 8 and 9 (sector FE + year FE).
+*** Event time capped at -3 and +4; t=-1 is the omitted baseline.
+*** Pre-trend test: joint F-test that the t=-3 and t=-2 coefficients are zero.
+**************************************************************************
+gen event_time_ind = year - first_treat_ind if first_treat_ind != 0 & first_treat_ind != .
+replace event_time_ind = -3 if event_time_ind < -3 & event_time_ind != .
+replace event_time_ind = 4  if event_time_ind > 4  & event_time_ind != .
+
+foreach t in m3 m2 0 1 2 3 4 {
+	gen sevt_`t' = 0
+}
+replace sevt_m3 = 1 if event_time_ind == -3
+replace sevt_m2 = 1 if event_time_ind == -2
+replace sevt_0  = 1 if event_time_ind ==  0
+replace sevt_1  = 1 if event_time_ind ==  1
+replace sevt_2  = 1 if event_time_ind ==  2
+replace sevt_3  = 1 if event_time_ind ==  3
+replace sevt_4  = 1 if event_time_ind ==  4
+
+local evt      sevt_m3 sevt_m2 sevt_0 sevt_1 sevt_2 sevt_3 sevt_4
+local outcomes lnprofit lnsales_real lnempl lnavg_wage tfp_tl_pc tfp_cd_pc lnvaw
+
+*** Samples: all sectors, nationally connected vs never-connected, locally connected vs never-connected
+local cond_all ""
+local cond_nat "if first_treat_ind==2013 | first_treat_ind==2014 | first_treat_ind==2017 | first_treat_ind==0"
+local cond_loc "if first_treat_ind==2011 | first_treat_ind==2015 | first_treat_ind==0"
+local name_all "All Sectors"
+local name_nat "National Sectors"
+local name_loc "Local Sectors"
+
+foreach s in all nat loc {
+	eststo clear
+	local graphs ""
+	foreach v in `outcomes' {
+		eststo: reghdfe `v' `evt' ind_lost `cond_`s'', ///
+			cluster(nace4) absorb(i.nace4 i.year)
+		test sevt_m3 sevt_m2
+		estadd scalar pretrend_F = r(F)
+		estadd scalar pretrend_p = r(p)
+
+		coefplot, keep(`evt') vertical ///
+			yline(0, lcolor(red) lpattern(dash)) ///
+			order(`evt') ///
+			rename(sevt_m3="-3" sevt_m2="-2" sevt_0="0" sevt_1="1" sevt_2="2" sevt_3="3" sevt_4="4") ///
+			title("${label_`v'} - `name_`s''", size(medium)) ///
+			xtitle("Years relative to sector connection") ytitle("Coefficient") ///
+			mcolor(maroon) ciopts(recast(rcap) color(maroon))
+		graph save "${figures}/sevt_`s'_`v'.gph", replace
+		local graphs `"`graphs' "${figures}/sevt_`s'_`v'.gph""'
+	}
+	esttab using "${tables}/FigureA2_event_study_sectors_`s'.csv", keep(`evt') ///
+		nocons se r2 scalars(pretrend_F pretrend_p) starlevels(* 0.1 ** 0.05 *** 0.01) replace
+
+	graph combine `graphs', rows(2) title("Event Studies: `name_`s''") xsize(20) ysize(12)
+	graph export "${figures}/FigureA2_event_studies_sectors_`s'.pdf", replace
+}
+
+*** All outcomes x all sector types in one figure
+local all_graphs ""
+foreach v in `outcomes' {
+	local all_graphs `"`all_graphs' "${figures}/sevt_all_`v'.gph" "${figures}/sevt_nat_`v'.gph" "${figures}/sevt_loc_`v'.gph""'
+}
+graph combine `all_graphs', rows(7) cols(3) ///
+	title("Event Studies: All Outcomes by Sector Type") xsize(20) ysize(40)
+graph export "${figures}/FigureA2_event_studies_sectors_combined.pdf", replace
+
+*** END
