@@ -11,12 +11,11 @@ This repository contains the replication materials (scripts and documentation) f
 replication_package/
 ├── README.md
 ├── code/
-│   └── Political_connections_WBPR_replication.do   # produces all tables and event-study figures
+│   └── Political_connections_WBPR_replication.do   # produces all tables
 ├── data/
 │   └── Orbis_pcfirms_elections_merged.dta          # starting dataset (not on GitHub, see below)
 └── output/
-    ├── tables/                                     # created by the do-file
-    └── figures/                                    # created by the do-file
+    └── tables/                                     # created by the do-file
 ```
 
 ## Data Availability Statement
@@ -68,11 +67,11 @@ Availability: not publicly available.
 
 1. Download `Orbis_pcfirms_elections_merged.dta` and place it in `data/`.
 2. Open `code/Political_connections_WBPR_replication.do` and set `global root` (Section 0) to the path of this folder. No other paths need to be changed.
-3. Run the do-file. Tables are written to `output/tables/` and figures to `output/figures/`. Tables 1–4 and the descriptive counts are printed in the Stata log.
+3. Run the do-file. Tables are written to `output/tables/`. Tables 1–4 and the descriptive counts are printed in the Stata log.
 
 ## Scripts
 
-The replication package contains one Stata do-file, **`Political_connections_WBPR_replication.do`**, which produces all tables and figures in the paper. It is organised by table and figure, with a clear heading for each followed by the code that produces it. Part A runs the firm-level analysis and Part B the sector-level analysis. Each part starts from the same dataset and first defines the sample and the election-based treatment variables.
+The replication package contains one Stata do-file, **`Political_connections_WBPR_replication.do`**, which produces all tables in the paper. It is organised by table, with a clear heading for each followed by the code that produces it. Part A runs the firm-level analysis and Part B the sector-level analysis. Each part starts from the same dataset and first defines the sample and the election-based treatment variables.
 
 | Output | Description | Section in do-file | Output file |
 |---|---|---|---|
@@ -86,8 +85,6 @@ The replication package contains one Stata do-file, **`Political_connections_WBP
 | Table 8 | Political connections and sector aggregate growth | Part B, Table 8 | `Table8_sectors_connected.csv/.tex` |
 | Table 9 | Local vs national elections, sector level | Part B, Table 9 | `Table9_sectors_local_national.csv/.tex` |
 | Table 10 (Annex) | Firm performance by election margins | Part A, Table 10 | `Table10_firms_margins.csv/.tex` |
-| Figure A1 | Event studies, firm level (all / national / local), with pre-trend F-tests | Part A, Figure A1 | `FigureA1_*.pdf`, `FigureA1_*.csv` |
-| Figure A2 | Event studies, sector level (all / national / local), with pre-trend F-tests | Part B, Figure A2 | `FigureA2_*.pdf`, `FigureA2_*.csv` |
 | Figures 1–2 | National and local election timelines | n/a | Illustrations based on the election calendar; not produced by code |
 
 ## License

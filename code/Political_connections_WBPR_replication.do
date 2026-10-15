@@ -3,7 +3,7 @@
 *** "The Economic Impact of Firms' Political Connections"
 *** Ibrahimi, Fazekas, Schiffbauer, Galev
 ***
-*** Produces all tables and the event-study figures of the paper.
+*** Produces all tables of the paper.
 *** Starting dataset: Orbis_pcfirms_elections_merged.dta
 ***   (political connection variables and TFP already computed;
 ***    election-based treatment variables are defined below)
@@ -17,7 +17,6 @@
 ***   Table 3   Descriptive statistics: regions
 ***   Table 5   Connecting to power - firm performance
 ***   Table 6   Connecting to power - local vs national elections
-***   Figure A1 Event studies - firm level (Table 5/6 specification)
 ***   Table 7   Losing connections
 ***   Table 10  Election margins (Annex)
 ***   PART B - SECTOR-LEVEL ANALYSIS
@@ -25,7 +24,6 @@
 ***   Table 4   Number of sectors across years
 ***   Table 8   Sector connecting to power
 ***   Table 9   Sector connecting to power - local vs national elections
-***   Figure A2 Event studies - sector level (Table 8/9 specification)
 ***
 *** Figures 1 and 2 (election timelines) are illustrations based on the
 *** election calendar and are not produced by code.
@@ -43,7 +41,6 @@ global root "/Users/kleaibrahimi/Library/CloudStorage/Dropbox/bulgaria/World_Ban
 
 global data    "${root}/data"
 global tables  "${root}/output/tables"
-global figures "${root}/output/figures"
 
 *** Required user-written packages (uncomment to install)
 * ssc install ftools,    replace
@@ -67,15 +64,6 @@ global keepvars bvdidnumber empl nuts3_int year lnsales_real lnva_real ///
 	Parliament_41 Parliament_42 Parliament_43 Parliament_44 locally_con ///
 	national_conn age emp nace2 standardisedlegalform active nace4 codemun ///
 	margins_2015 margins_2011 materialcosts_real
-
-*** Event-study plot labels
-global label_lnprofit     "Log Profit"
-global label_lnsales_real "Log Sales"
-global label_lnempl       "Log Employment"
-global label_lnavg_wage   "Log Average Wage"
-global label_lnvaw        "Log Value Added per Worker"
-global label_tfp_tl_pc    "TFP (Levinsohn-Petrin)"
-global label_tfp_cd_pc    "TFP (Cobb-Douglas)"
 
 
 **************************************************************************
@@ -228,76 +216,6 @@ foreach v in `outcomes2' {
 }
 esttab using "${tables}/Table6_firms_local_national.csv", nocons se r2 ar2 starlevels(* 0.1 ** 0.05 *** 0.01) replace
 esttab using "${tables}/Table6_firms_local_national.tex", nocons se r2 ar2 starlevels(* 0.1 ** 0.05 *** 0.01) replace
-
-
-**************************************************************************
-*** FIGURE A1: Event studies - firm level
-*** Same specification and sample as Tables 5 and 6.
-*** Event time capped at -3 and +4; t=-1 is the omitted baseline.
-*** Pre-trend test: joint F-test that the t=-3 and t=-2 coefficients are zero.
-**************************************************************************
-gen event_time = year - first_treat if first_treat != 0 & first_treat != .
-replace event_time = . if first_treat == 2007 | first_treat == 2009
-replace event_time = -3 if event_time < -3 & event_time != .
-replace event_time = 4  if event_time > 4  & event_time != .
-
-foreach t in m3 m2 0 1 2 3 4 {
-	gen evt_`t' = 0
-}
-replace evt_m3 = 1 if event_time == -3
-replace evt_m2 = 1 if event_time == -2
-replace evt_0  = 1 if event_time ==  0
-replace evt_1  = 1 if event_time ==  1
-replace evt_2  = 1 if event_time ==  2
-replace evt_3  = 1 if event_time ==  3
-replace evt_4  = 1 if event_time ==  4
-
-local evt      evt_m3 evt_m2 evt_0 evt_1 evt_2 evt_3 evt_4
-local outcomes lnprofit lnsales_real lnempl lnavg_wage lnvaw tfp_tl_pc tfp_cd_pc
-
-*** Samples: all firms, nationally connected vs never-connected, locally connected vs never-connected
-local cond_all ""
-local cond_nat "if first_treat==2013 | first_treat==2014 | first_treat==2017 | pcfirm==0"
-local cond_loc "if first_treat==2011 | first_treat==2015 | pcfirm==0"
-local name_all "All Firms"
-local name_nat "National Firms"
-local name_loc "Local Firms"
-
-foreach s in all nat loc {
-	eststo clear
-	local graphs ""
-	foreach v in `outcomes' {
-		eststo: reghdfe `v' `evt' treated_lost treated_pre10 lnage `cond_`s'', ///
-			cluster(nace4) absorb(i.nace4##i.year i.bvdidnumber)
-		test evt_m3 evt_m2
-		estadd scalar pretrend_F = r(F)
-		estadd scalar pretrend_p = r(p)
-
-		coefplot, keep(`evt') vertical ///
-			yline(0, lcolor(red) lpattern(dash)) ///
-			order(`evt') ///
-			rename(evt_m3="-3" evt_m2="-2" evt_0="0" evt_1="1" evt_2="2" evt_3="3" evt_4="4") ///
-			title("${label_`v'} - `name_`s''", size(medium)) ///
-			xtitle("Years relative to connection") ytitle("Coefficient") ///
-			mcolor(navy) ciopts(recast(rcap) color(navy))
-		graph save "${figures}/evt_`s'_`v'.gph", replace
-		local graphs `"`graphs' "${figures}/evt_`s'_`v'.gph""'
-	}
-	esttab using "${tables}/FigureA1_event_study_firms_`s'.csv", keep(`evt') ///
-		nocons se r2 scalars(pretrend_F pretrend_p) starlevels(* 0.1 ** 0.05 *** 0.01) replace
-
-	graph combine `graphs', rows(2) title("Event Studies: `name_`s''") xsize(20) ysize(12)
-	graph export "${figures}/FigureA1_event_studies_firms_`s'.pdf", replace
-}
-
-*** All outcomes x all firm types in one figure
-local all_graphs ""
-foreach v in `outcomes' {
-	local all_graphs `"`all_graphs' "${figures}/evt_all_`v'.gph" "${figures}/evt_nat_`v'.gph" "${figures}/evt_loc_`v'.gph""'
-}
-graph combine `all_graphs', rows(7) cols(3) ///
-	title("Event Studies: All Outcomes by Firm Type") xsize(20) ysize(40)
-graph export "${figures}/FigureA1_event_studies_firms_combined.pdf", replace
 
 
 **************************************************************************
@@ -488,73 +406,5 @@ foreach v in `outcomes' {
 esttab using "${tables}/Table9_sectors_local_national.csv", nocons se r2 ar2 starlevels(* 0.1 ** 0.05 *** 0.01) replace
 esttab using "${tables}/Table9_sectors_local_national.tex", nocons se r2 ar2 starlevels(* 0.1 ** 0.05 *** 0.01) replace
 
-
-**************************************************************************
-*** FIGURE A2: Event studies - sector level
-*** Same specification and sample as Tables 8 and 9 (sector FE + year FE).
-*** Event time capped at -3 and +4; t=-1 is the omitted baseline.
-*** Pre-trend test: joint F-test that the t=-3 and t=-2 coefficients are zero.
-**************************************************************************
-gen event_time_ind = year - first_treat_ind if first_treat_ind != 0 & first_treat_ind != .
-replace event_time_ind = -3 if event_time_ind < -3 & event_time_ind != .
-replace event_time_ind = 4  if event_time_ind > 4  & event_time_ind != .
-
-foreach t in m3 m2 0 1 2 3 4 {
-	gen sevt_`t' = 0
-}
-replace sevt_m3 = 1 if event_time_ind == -3
-replace sevt_m2 = 1 if event_time_ind == -2
-replace sevt_0  = 1 if event_time_ind ==  0
-replace sevt_1  = 1 if event_time_ind ==  1
-replace sevt_2  = 1 if event_time_ind ==  2
-replace sevt_3  = 1 if event_time_ind ==  3
-replace sevt_4  = 1 if event_time_ind ==  4
-
-local evt      sevt_m3 sevt_m2 sevt_0 sevt_1 sevt_2 sevt_3 sevt_4
-local outcomes lnprofit lnsales_real lnempl lnavg_wage tfp_tl_pc tfp_cd_pc lnvaw
-
-*** Samples: all sectors, nationally connected vs never-connected, locally connected vs never-connected
-local cond_all ""
-local cond_nat "if first_treat_ind==2013 | first_treat_ind==2014 | first_treat_ind==2017 | first_treat_ind==0"
-local cond_loc "if first_treat_ind==2011 | first_treat_ind==2015 | first_treat_ind==0"
-local name_all "All Sectors"
-local name_nat "National Sectors"
-local name_loc "Local Sectors"
-
-foreach s in all nat loc {
-	eststo clear
-	local graphs ""
-	foreach v in `outcomes' {
-		eststo: reghdfe `v' `evt' ind_lost `cond_`s'', ///
-			cluster(nace4) absorb(i.nace4 i.year)
-		test sevt_m3 sevt_m2
-		estadd scalar pretrend_F = r(F)
-		estadd scalar pretrend_p = r(p)
-
-		coefplot, keep(`evt') vertical ///
-			yline(0, lcolor(red) lpattern(dash)) ///
-			order(`evt') ///
-			rename(sevt_m3="-3" sevt_m2="-2" sevt_0="0" sevt_1="1" sevt_2="2" sevt_3="3" sevt_4="4") ///
-			title("${label_`v'} - `name_`s''", size(medium)) ///
-			xtitle("Years relative to sector connection") ytitle("Coefficient") ///
-			mcolor(maroon) ciopts(recast(rcap) color(maroon))
-		graph save "${figures}/sevt_`s'_`v'.gph", replace
-		local graphs `"`graphs' "${figures}/sevt_`s'_`v'.gph""'
-	}
-	esttab using "${tables}/FigureA2_event_study_sectors_`s'.csv", keep(`evt') ///
-		nocons se r2 scalars(pretrend_F pretrend_p) starlevels(* 0.1 ** 0.05 *** 0.01) replace
-
-	graph combine `graphs', rows(2) title("Event Studies: `name_`s''") xsize(20) ysize(12)
-	graph export "${figures}/FigureA2_event_studies_sectors_`s'.pdf", replace
-}
-
-*** All outcomes x all sector types in one figure
-local all_graphs ""
-foreach v in `outcomes' {
-	local all_graphs `"`all_graphs' "${figures}/sevt_all_`v'.gph" "${figures}/sevt_nat_`v'.gph" "${figures}/sevt_loc_`v'.gph""'
-}
-graph combine `all_graphs', rows(7) cols(3) ///
-	title("Event Studies: All Outcomes by Sector Type") xsize(20) ysize(40)
-graph export "${figures}/FigureA2_event_studies_sectors_combined.pdf", replace
 
 *** END
