@@ -52,7 +52,7 @@ global figures "${root}/output/figures"
 * ssc install coefplot,  replace
 * ssc install ietoolkit, replace   // iebaltab
 
-*** Variables kept from the starting dataset
+*** Variables loaded from the starting dataset
 global keepvars bvdidnumber empl nuts3_int year lnsales_real lnva_real ///
 	lnempl lnrev_real lnaveragecostofemployee_th_real lnfixedassets_real ///
 	lnintangiblefixedassets_real lncap_real lnage markup_tl_pc Markup_tl_pc ///
@@ -87,11 +87,9 @@ global label_tfp_cd_pc    "TFP (Cobb-Douglas)"
 **************************************************************************
 *** A.1 SAMPLE AND VARIABLE DEFINITIONS
 **************************************************************************
-use "${data}/Orbis_pcfirms_elections_merged.dta", clear
+use ${keepvars} using "${data}/Orbis_pcfirms_elections_merged.dta", clear
 
 drop if missing(codemun) // drop observations with no information on municipality code
-
-keep ${keepvars}
 
 gen pcfirm=0
 replace pcfirm=1 if mergepc==3
@@ -366,11 +364,9 @@ eststo clear
 **************************************************************************
 *** B.1 SAMPLE AND VARIABLE DEFINITIONS
 **************************************************************************
-use "${data}/Orbis_pcfirms_elections_merged.dta", clear
+use ${keepvars} using "${data}/Orbis_pcfirms_elections_merged.dta", clear
 
 drop if missing(codemun) // drop observations with no information on municipality code
-
-keep ${keepvars}
 
 gen pcfirm=0
 replace pcfirm=1 if mergepc==3
