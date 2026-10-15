@@ -175,6 +175,13 @@ restore
 
 
 **************************************************************************
+*** Balanced sample for Tables 5, 6, 7 and 10: drop never-connected firms
+*** with missing value added per worker
+**************************************************************************
+drop if pcfirm==0 & lnvaw==.
+
+
+**************************************************************************
 *** TABLE 5: Connecting to power - firm performance
 **************************************************************************
 eststo clear
@@ -221,8 +228,6 @@ esttab using "${tables}/Table6_firms_local_national.tex", nocons se r2 ar2 starl
 **************************************************************************
 *** TABLE 7: Losing connections
 **************************************************************************
-drop if pcfirm==0 & lnvaw==. // more balanced sample
-
 eststo clear
 
 local outcomes1 lnprofit lnsales_real lnempl lnavg_wage lnvaw
@@ -244,14 +249,14 @@ esttab using "${tables}/Table7_firms_lost.tex", nocons se r2 ar2 starlevels(* 0.
 
 **************************************************************************
 *** TABLE 10 (Annex): Connecting to local power by election margin
-*** Low margin: winning margin <= 10%; high margin: > 10%
+*** Low margin: winning margin <= 30%; high margin: > 30%
 **************************************************************************
 gen loc_low_marg=0
 gen loc_high_marg=0
-replace loc_low_marg=1  if first_treat==2011 & margins_2011<=0.1 & year>=2011
-replace loc_low_marg=1  if first_treat==2015 & margins_2015<=0.1 & year>=2015
-replace loc_high_marg=1 if first_treat==2011 & margins_2011>0.1  & year>=2011
-replace loc_high_marg=1 if first_treat==2015 & margins_2015>0.1  & year>=2015
+replace loc_low_marg=1  if first_treat==2011 & margins_2011<=0.3 & year>=2011
+replace loc_low_marg=1  if first_treat==2015 & margins_2015<=0.3 & year>=2015
+replace loc_high_marg=1 if first_treat==2011 & margins_2011>0.3  & year>=2011
+replace loc_high_marg=1 if first_treat==2015 & margins_2015>0.3  & year>=2015
 
 eststo clear
 
