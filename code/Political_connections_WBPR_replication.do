@@ -12,7 +12,8 @@
 ***   0.  Setup
 ***   PART A - FIRM-LEVEL ANALYSIS
 ***   A.1 Sample and variable definitions
-***   Tables 1-3 Descriptive statistics (firms observed in 2010)
+***   Table 1   Descriptive statistics: outcomes (all firm-years)
+***   Tables 2-3 Descriptive statistics: size, age, sector, region (2010)
 ***   Table 5   Connecting to power - firm performance
 ***   Table 6   Connecting to power - local vs national elections
 ***   Table 7   Losing connections
@@ -143,17 +144,27 @@ label values type type_lbl
 
 
 **************************************************************************
-*** TABLES 1-3: Descriptive statistics (firms observed in 2010)
+*** TABLE 1: Descriptive statistics - outcomes by connection type
+*** (all firm-years 2010-2018, observed values only; no imputation)
 **************************************************************************
 gen log_tfp_tl = log(tfp_tl_pc)
 gen log_tfp_cd = log(tfp_cd_pc)
 
+iebaltab lnprofit lnsales_real lnempl lnavg_wage log_tfp_tl log_tfp_cd lnva_real, ///
+	grpvar(type) savetex("${tables}/Table1_descriptives.tex") replace
+
+*** Number of unique firms by type
+codebook bvdidnumber if type==1, compact
+codebook bvdidnumber if type==2, compact
+codebook bvdidnumber if type==3, compact
+
+
+**************************************************************************
+*** TABLES 2-3: Descriptive statistics - size, age, sector, region
+*** (firms observed in 2010)
+**************************************************************************
 preserve
 	keep if year==2010
-
-	*** Table 1: outcomes by connection type, with pairwise t-tests
-	iebaltab lnprofit lnsales_real lnempl lnavg_wage log_tfp_tl log_tfp_cd lnva_real, ///
-		grpvar(type) savetex("${tables}/Table1_descriptives.tex") replace
 
 	*** Table 2: size, age and sector shares (column %)
 	tab Size          type, col nofreq

@@ -75,9 +75,9 @@ The replication package contains one Stata do-file, **`Political_connections_WBP
 
 | Output | Description | Section in do-file | Output file |
 |---|---|---|---|
-| Table 1 | Descriptive statistics: outcomes by connection type (firms observed in 2010) | Part A, Tables 1–3 | `Table1_descriptives.tex` |
-| Table 2 | Descriptive statistics: size, age, sector (firms observed in 2010) | Part A, Tables 1–3 | Stata log |
-| Table 3 | Descriptive statistics: NUTS-3 regions (firms observed in 2010) | Part A, Tables 1–3 | Stata log |
+| Table 1 | Descriptive statistics: outcomes by connection type (all firm-years, no imputation) | Part A, Table 1 | `Table1_descriptives.tex` |
+| Table 2 | Descriptive statistics: size, age, sector (firms observed in 2010) | Part A, Tables 2–3 | Stata log |
+| Table 3 | Descriptive statistics: NUTS-3 regions (firms observed in 2010) | Part A, Tables 2–3 | Stata log |
 | Table 4 | Number of sectors across years | Part B, Table 4 | `Table4_sectors_by_year.csv` |
 | Table 5 | Connecting to power and firm performance | Part A, Table 5 | `Table5_firms_connected.csv/.tex` |
 | Table 6 | Local vs national elections, firm level | Part A, Table 6 | `Table6_firms_local_national.csv/.tex` |
