@@ -338,8 +338,9 @@ forvalues i = 2010(1)2018 {
 }
 
 *** Sector loses connection: all connected firms in the sector have lost power
-bysort nace4 year: gen treated_sum_ind=sum(treated)
-bysort nace4: gen ever_treated=sum(treated)
+*** Running sums need a fixed order within groups to be reproducible
+bysort nace4 year (bvdidnumber): gen treated_sum_ind=sum(treated)
+bysort nace4 (year bvdidnumber): gen ever_treated=sum(treated)
 bysort nace4 year: egen first_lost_ind=max(first_lost) if treated_sum_ind==0 & ever_treated!=0
 
 replace first_treat_ind=0 if first_treat_ind==.
