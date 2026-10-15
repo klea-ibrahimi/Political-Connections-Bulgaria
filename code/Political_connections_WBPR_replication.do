@@ -12,9 +12,7 @@
 ***   0.  Setup
 ***   PART A - FIRM-LEVEL ANALYSIS
 ***   A.1 Sample and variable definitions
-***   Table 1   Descriptive statistics: outcomes
-***   Table 2   Descriptive statistics: size, age, sector
-***   Table 3   Descriptive statistics: regions
+***   Tables 1-3 Descriptive statistics (firms observed in 2010)
 ***   Table 5   Connecting to power - firm performance
 ***   Table 6   Connecting to power - local vs national elections
 ***   Table 7   Losing connections
@@ -145,23 +143,17 @@ label values type type_lbl
 
 
 **************************************************************************
-*** TABLE 1: Descriptive statistics - outcomes by connection type
+*** TABLES 1-3: Descriptive statistics (firms observed in 2010)
 **************************************************************************
-iebaltab lnprofit lnsales_real lnempl lnavg_wage tfp_tl_pc tfp_cd_pc lnva_real, ///
-	grpvar(type) savetex("${tables}/Table1_descriptives.tex") replace
+gen log_tfp_tl = log(tfp_tl_pc)
+gen log_tfp_cd = log(tfp_cd_pc)
 
-*** Number of unique firms by type
-codebook bvdidnumber if type==1, compact
-codebook bvdidnumber if type==2, compact
-codebook bvdidnumber if type==3, compact
-
-
-**************************************************************************
-*** TABLES 2-3: Descriptive statistics - size, age, sector, region
-*** (one observation per firm: first year observed)
-**************************************************************************
 preserve
-	bysort bvdidnumber (year): keep if _n==1
+	keep if year==2010
+
+	*** Table 1: outcomes by connection type, with pairwise t-tests
+	iebaltab lnprofit lnsales_real lnempl lnavg_wage log_tfp_tl log_tfp_cd lnva_real, ///
+		grpvar(type) savetex("${tables}/Table1_descriptives.tex") replace
 
 	*** Table 2: size, age and sector shares (column %)
 	tab Size          type, col nofreq
@@ -359,25 +351,27 @@ replace treated_ind_nat=1 if first_treat_ind==2017 & year>=2017
 
 
 **************************************************************************
-*** TABLE 4: Number of sectors across years
-*** Computed before dropping sectors connected in 2007/2009.
-**************************************************************************
-preserve
-	collapse (max) treated_ind ind_lost, by(nace4 year)
-	gen sector_status = 1
-	replace sector_status = 2 if treated_ind==1
-	replace sector_status = 3 if ind_lost==1
-	label define status_lbl 1 "Not yet connected" 2 "Connected" 3 "Disconnected"
-	label values sector_status status_lbl
-	tab sector_status year
-restore
-
-
-**************************************************************************
 *** Sample restriction: drop sectors connected before 2010
 **************************************************************************
 drop if first_treat_ind==2007
 drop if first_treat_ind==2009
+
+
+**************************************************************************
+*** TABLE 4: Number of sectors across years
+*** Connected: sector has had at least one newly connected firm (including
+*** sectors that later lost the connection); Disconnected: of which lost it.
+**************************************************************************
+preserve
+	collapse (max) treated_ind ind_lost, by(nace4 year)
+	gen not_yet      = (treated_ind==0)
+	gen connected    = (treated_ind==1)
+	gen disconnected = (treated_ind==1 & ind_lost==1)
+	gen total        = 1
+	collapse (sum) not_yet connected disconnected total, by(year)
+	list, noobs sep(0)
+	export delimited using "${tables}/Table4_sectors_by_year.csv", replace
+restore
 
 
 **************************************************************************
