@@ -12,8 +12,7 @@ replication_package/
 ├── README.md
 ├── code/
 │   └── Political_connections_WBPR_replication.do   # produces all tables
-├── data/
-│   └── Orbis_pcfirms_elections_merged.dta          # starting dataset (not on GitHub, see below)
+├── data/                                           # create this folder; put the dataset here (not on GitHub)
 └── output/
     └── tables/                                     # created by the do-file
 ```
@@ -24,7 +23,7 @@ The datasets combine licensed, non-public and public sources (see below). The el
 
 ### Datasets
 
-The replication package uses the Stata dataset **`Orbis_pcfirms_elections_merged.dta`** (≈5.2 GB, firm-year panel, Bulgaria 2010–2018). Download link: **[TO ADD: Google Drive link]**. Place the file in `data/`.
+The replication package uses the Stata dataset **`Orbis_pcfirms_elections_merged.dta`** (≈5.2 GB, firm-year panel, Bulgaria 2010–2018). The dataset is not included in this repository; it is shared separately by the authors with restricted access. Place the file in a folder named `data/` in the root of this package.
 
 The dataset already contains the political connection variables and TFP (Levinsohn–Petrin and Cobb–Douglas, computed beforehand). The election-based treatment variables and all remaining variables used in the analysis are defined in the do-file. The dataset combines three sources:
 
@@ -65,7 +64,7 @@ Availability: not publicly available.
 
 ## Instructions
 
-1. Download `Orbis_pcfirms_elections_merged.dta` and place it in `data/`.
+1. Create a folder `data/` in the root of this package and place `Orbis_pcfirms_elections_merged.dta` in it.
 2. Open `code/Political_connections_WBPR_replication.do` and set `global root` (Section 0) to the path of this folder. No other paths need to be changed.
 3. Run the do-file. Tables are written to `output/tables/`. Tables 2–3 are printed in the Stata log.
 
